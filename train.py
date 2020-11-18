@@ -36,21 +36,18 @@ parser.add_argument('--decay_epoch', type=int, default = 5,
                     help = 'decay epoch')
 parser.add_argument('--path', default = './',
                     help = 'traffic file')
-parser.add_argument('--traffic_file', default = 'data/PeMS.h5',
-                    help = 'traffic file')
-parser.add_argument('--SE_file', default = 'data/SE(PeMS).txt',
-                    help = 'spatial emebdding file')
-parser.add_argument('--model_file', default = 'data/GMAN(PeMS)',
-                    help = 'save the model to disk')
-parser.add_argument('--log_file', default = 'data/log(PeMS)',
-                    help = 'log file')
+parser.add_argument('--dataset', default = 'PeMS',
+                    help = 'Traffic dataset name')
 parser.add_argument('--load_model', default = 'F',
                     help = 'Set T if pretrained model is to be loaded before training start')
+
 args = parser.parse_args()
+LOG_FILE = args.path+'data/log('+args.dataset+')'
+MODEL_FILE = args.path+'data/GMAN('+args.dataset+')'
 
 start = time.time()
 
-log = open(args.path+args.log_file, 'w')
+log = open(LOG_FILE, 'w')
 utils.log_string(log, str(args)[10 : -1])
 
 # load data
@@ -87,8 +84,8 @@ optimizer = torch.optim.Adam(gman.parameters(), lr=args.learning_rate, weight_de
 
 utils.log_string(log, '**** training model ****')
 if args.load_model == 'T':
-    utils.log_string(log, 'loading pretrained model from %s' % (args.path+args.model_file))
-    gman.load_state_dict(torch.load(args.path+args.model_file))
+    utils.log_string(log, 'loading pretrained model from %s' % MODEL_FILE)
+    gman.load_state_dict(torch.load(MODEL_FILE))
 num_train, _, N = trainX.shape
 num_val = valX.shape[0]
 wait = 0
@@ -154,19 +151,18 @@ for epoch in range(args.max_epoch):
         utils.log_string(
             log,
             'val loss decrease from %.4f to %.4f, saving model to %s' %
-            (val_loss_min, val_loss, args.path+args.model_file))
+            (val_loss_min, val_loss, MODEL_FILE))
         wait = 0
         val_loss_min = val_loss
-        #saver.save(sess, args.model_file)
-        torch.save(gman.state_dict(), args.path+args.model_file)
+        torch.save(gman.state_dict(), MODEL_FILE)
     else:
         wait += 1
 
 
 # test model
 utils.log_string(log, '**** testing model ****')
-utils.log_string(log, 'loading model from %s' % (args.path+args.model_file))
-gman.load_state_dict(torch.load(args.path+args.model_file))
+utils.log_string(log, 'loading model from %s' % MODEL_FILE)
+gman.load_state_dict(torch.load(MODEL_FILE))
 utils.log_string(log, 'model restored!')
 utils.log_string(log, 'evaluating...')
 

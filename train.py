@@ -67,7 +67,7 @@ trainY = torch.FloatTensor(trainY).to(device)
 SE = torch.FloatTensor(SE).to(device)
 
 TEmbsize = (24*60//args.time_slot)+7 #number of slots in a day + number of days in a week
-gman = model.GMAN(args.K, args.d, SE.shape[1], TEmbsize, args.P, args.L).to(device)
+gman = model.GMAN(args.K, args.d, SE.shape[1], TEmbsize, args.P, args.L, device).to(device)
 optimizer = torch.optim.Adam(gman.parameters(), lr=args.learning_rate, weight_decay=0.00001)
 
 # ~ pred = gman(trainX[0:10], SE, trainTE[0:10])
@@ -104,7 +104,7 @@ for epoch in range(args.max_epoch):
         #print("SEShape:", SE.shape)
         #print("batchTEShape:", batchTE.shape)
         batchpred = gman(batchX, SE, batchTE)
-        batchloss = model.mae_loss(batchpred, batchlabel)
+        batchloss = model.mae_loss(batchpred, batchlabel, device)
         print("Loss: ", batchloss.item())
         batchloss.backward()
         optimizer.step()

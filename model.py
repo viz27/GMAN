@@ -3,13 +3,14 @@ import torch.nn.functional as F
 
 
 class STEmbModel(torch.nn.Module):
-    def __init__(self, SEDims, TEDims, OutDims):
+    def __init__(self, SEDims, TEDims, OutDims, device):
         super(STEmbModel, self).__init__()
         self.TEDims = TEDims
         self.fc3 = torch.nn.Linear(SEDims, OutDims)
         self.fc4 = torch.nn.Linear(OutDims, OutDims)
         self.fc5 = torch.nn.Linear(TEDims, OutDims)
         self.fc6 = torch.nn.Linear(OutDims, OutDims)
+        self.device = device
 
 
     def forward(self, SE, TE):
@@ -24,7 +25,7 @@ class STEmbModel(torch.nn.Module):
         timeofday = F.one_hot(TE[..., 1], num_classes = self.TEDims-7)
         TE = torch.cat((dayofweek, timeofday), dim=-1)
         #print("TEShape:", TE.shape)
-        TE = TE.unsqueeze(2).type(torch.FloatTensor)
+        TE = TE.unsqueeze(2).type(torch.FloatTensor).to(self.device)
         #print("TEShape:", TE.shape)
         TE = self.fc6(F.relu(self.fc5(TE)))
         #print("TEShape:", TE.shape)
@@ -240,12 +241,12 @@ class TransformAttentionModel(torch.nn.Module):
 
 
 class GMAN(torch.nn.Module):
-    def __init__(self, K, d, SEDims, TEDims, P, L):
+    def __init__(self, K, d, SEDims, TEDims, P, L, device):
         super(GMAN, self).__init__()
         D = K*d
         self.fc1 = torch.nn.Linear(1, D)
         self.fc2 = torch.nn.Linear(D, D)
-        self.STEmb = STEmbModel(SEDims, TEDims, K*d)
+        self.STEmb = STEmbModel(SEDims, TEDims, K*d, device)
         self.STAttBlockEnc = STAttModel(K, d)
         self.STAttBlockDec = STAttModel(K, d)
         self.transformAttention = TransformAttentionModel(K, d)
@@ -273,13 +274,13 @@ class GMAN(torch.nn.Module):
         return X.squeeze(3)
 
 
-def mae_loss(pred, label):
+def mae_loss(pred, label, device):
     #print("****Inside mae_loss block***")
     #print("predShape:", pred.shape)
     #print("labelShape:", label.shape)
     mask = (label != 0)
     #print("maskShape:", mask.shape)
-    mask = mask.type(torch.FloatTensor)
+    mask = mask.type(torch.FloatTensor).to(device)
     #print("maskShape:", mask.shape)
     mask /= torch.mean(mask) #TODO:- Why is this needed??
     #print("maskShape:", mask.shape)

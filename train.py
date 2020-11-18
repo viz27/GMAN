@@ -44,11 +44,13 @@ parser.add_argument('--model_file', default = 'data/GMAN(PeMS)',
                     help = 'save the model to disk')
 parser.add_argument('--log_file', default = 'data/log(PeMS)',
                     help = 'log file')
+parser.add_argument('--load_model', default = 'F',
+                    help = 'Set T if pretrained model is to be loaded before training start')
 args = parser.parse_args()
 
 start = time.time()
 
-log = open(args.log_file, 'w')
+log = open(args.path+args.log_file, 'w')
 utils.log_string(log, str(args)[10 : -1])
 
 # load data
@@ -83,6 +85,10 @@ optimizer = torch.optim.Adam(gman.parameters(), lr=args.learning_rate, weight_de
 # ~ loss = model.mae_loss(pred, label)
 # ~ print("loss:", loss.item())
 
+utils.log_string(log, '**** training model ****')
+if args.load_model == 'T':
+    utils.log_string(log, 'loading pretrained model from %s' % (args.path+args.model_file))
+    gman.load_state_dict(torch.load(args.path+args.model_file))
 num_train, _, N = trainX.shape
 num_val = valX.shape[0]
 wait = 0
@@ -115,7 +121,7 @@ for epoch in range(args.max_epoch):
         batchloss = model.mae_loss(batchpred, batchlabel, device)
         if (batch_idx+1) % 100 == 0:
             print("Batch: ", batch_idx+1, "out of", num_batch, end=" | ")
-            print("Loss: ", batchloss.item())
+            print("Loss: ", batchloss.item(), flush=True)
         batchloss.backward()
         optimizer.step()
         train_loss += batchloss.item() * (end_idx - start_idx)
@@ -204,6 +210,10 @@ for batch_idx in range(num_batch):
 end_test = time.time()
 testPred = np.concatenate(testPred, axis = 0)
 
+trainY = trainY.cpu().numpy()
+valY = valY.cpu().numpy()
+testY = testY.cpu().numpy()
+
 train_mae, train_rmse, train_mape = utils.metric(trainPred, trainY)
 val_mae, val_rmse, val_mape = utils.metric(valPred, valY)
 test_mae, test_rmse, test_mape = utils.metric(testPred, testY)
@@ -232,5 +242,4 @@ utils.log_string(
     (average_mae, average_rmse, average_mape * 100))
 end = time.time()
 utils.log_string(log, 'total time: %.1fmin' % ((end - start) / 60))
-sess.close()
 log.close()

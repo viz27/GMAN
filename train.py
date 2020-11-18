@@ -24,7 +24,7 @@ parser.add_argument('--val_ratio', type = float, default = 0.1,
                     help = 'validation set [default : 0.1]')
 parser.add_argument('--test_ratio', type = float, default = 0.2,
                     help = 'testing set [default : 0.2]')
-parser.add_argument('--batch_size', type = int, default = 32,
+parser.add_argument('--batch_size', type = int, default = 10,
                     help = 'batch size')
 parser.add_argument('--max_epoch', type = int, default = 1000,
                     help = 'epoch to run')
@@ -62,12 +62,85 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
 #transform data to tensors
 trainX = torch.FloatTensor(trainX).to(device)
-SE = torch.FloatTensor(SE).to(device)
 trainTE = torch.LongTensor(trainTE).to(device)
+trainY = torch.FloatTensor(trainY).to(device)
+SE = torch.FloatTensor(SE).to(device)
 
 TEmbsize = (24*60//args.time_slot)+7 #number of slots in a day + number of days in a week
 gman = model.GMAN(args.K, args.d, SE.shape[1], TEmbsize, args.P, args.L).to(device)
 optimizer = torch.optim.Adam(gman.parameters(), lr=args.learning_rate, weight_decay=0.00001)
 
-output = gman(trainX[0:10], SE, trainTE[0:10])
-print(output.shape)
+# ~ pred = gman(trainX[0:10], SE, trainTE[0:10])
+# ~ label = trainY[0:10]
+# ~ loss = model.mae_loss(pred, label)
+# ~ print("loss:", loss.item())
+
+num_train, _, N = trainX.shape
+wait = 0
+val_loss_min = np.inf
+for epoch in range(args.max_epoch):
+    if wait >= args.patience:
+        utils.log_string(log, 'early stop at epoch: %04d' % (epoch))
+        break
+    # shuffle
+    permutation = np.random.permutation(num_train)
+    trainX = trainX[permutation]
+    trainTE = trainTE[permutation]
+    trainY = trainY[permutation]
+    # train loss
+    start_train = time.time()
+    train_loss = 0
+    num_batch = math.ceil(num_train / args.batch_size)
+    for batch_idx in range(num_batch):
+        gman.train()
+        optimizer.zero_grad()
+        print("Batch: ", batch_idx+1, "out of", num_batch, end=" | ")
+        start_idx = batch_idx * args.batch_size
+        end_idx = min(num_train, (batch_idx + 1) * args.batch_size)
+        batchX = trainX[start_idx : end_idx]
+        batchTE = trainTE[start_idx : end_idx]
+        batchlabel = trainY[start_idx : end_idx]
+        #print("batchXShape:", batchX.shape)
+        #print("SEShape:", SE.shape)
+        #print("batchTEShape:", batchTE.shape)
+        batchpred = gman(batchX, SE, batchTE)
+        batchloss = model.mae_loss(batchpred, batchlabel)
+        print("Loss: ", batchloss.item())
+        batchloss.backward()
+        optimizer.step()
+        #train_loss += batchloss.item() * (end_idx - start_idx)
+    #train_loss /= num_train
+    end_train = time.time()
+    # ~ # val loss
+    # ~ start_val = time.time()
+    # ~ val_loss = 0
+    # ~ num_batch = math.ceil(num_val / args.batch_size)
+    # ~ for batch_idx in range(num_batch):
+        # ~ start_idx = batch_idx * args.batch_size
+        # ~ end_idx = min(num_val, (batch_idx + 1) * args.batch_size)
+        # ~ feed_dict = {
+            # ~ X: valX[start_idx : end_idx],
+            # ~ TE: valTE[start_idx : end_idx],
+            # ~ label: valY[start_idx : end_idx],
+            # ~ is_training: False}
+        # ~ loss_batch = sess.run(loss, feed_dict = feed_dict)
+        # ~ val_loss += loss_batch * (end_idx - start_idx)
+    # ~ val_loss /= num_val
+    # ~ end_val = time.time()
+    # ~ utils.log_string(
+        # ~ log,
+        # ~ '%s | epoch: %04d/%d, training time: %.1fs, inference time: %.1fs' %
+        # ~ (datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), epoch + 1,
+         # ~ args.max_epoch, end_train - start_train, end_val - start_val))
+    # ~ utils.log_string(
+        # ~ log, 'train loss: %.4f, val_loss: %.4f' % (train_loss, val_loss))
+    # ~ if val_loss <= val_loss_min:
+        # ~ utils.log_string(
+            # ~ log,
+            # ~ 'val loss decrease from %.4f to %.4f, saving model to %s' %
+            # ~ (val_loss_min, val_loss, args.model_file))
+        # ~ wait = 0
+        # ~ val_loss_min = val_loss
+        # ~ saver.save(sess, args.model_file)
+    # ~ else:
+        # ~ wait += 1

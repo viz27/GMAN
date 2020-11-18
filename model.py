@@ -15,7 +15,7 @@ class STEmbModel(torch.nn.Module):
     def forward(self, SE, TE):
         #print("****Inside STEmbedding block***")
         #print("SEShape:", SE.shape)
-        SE = SE.unsqueeze_(0).unsqueeze_(0)
+        SE = SE.unsqueeze(0).unsqueeze(0)
         #print("SEShape:", SE.shape)
         SE = self.fc4(F.relu(self.fc3(SE)))
         #print("SEShape:", SE.shape)
@@ -24,7 +24,7 @@ class STEmbModel(torch.nn.Module):
         timeofday = F.one_hot(TE[..., 1], num_classes = self.TEDims-7)
         TE = torch.cat((dayofweek, timeofday), dim=-1)
         #print("TEShape:", TE.shape)
-        TE = TE.unsqueeze_(2).type(torch.FloatTensor)
+        TE = TE.unsqueeze(2).type(torch.FloatTensor)
         #print("TEShape:", TE.shape)
         TE = self.fc6(F.relu(self.fc5(TE)))
         #print("TEShape:", TE.shape)
@@ -73,9 +73,9 @@ class SpatialAttentionModel(torch.nn.Module):
         X = torch.matmul(attention, value)
         #print("XShape:", X.shape)
         
-        liss = torch.split(X, X.shape[0]//self.K, dim=0)
-        for xxx in liss:
-            print(xxx.shape)
+        # ~ liss = torch.split(X, X.shape[0]//self.K, dim=0)
+        # ~ for xxx in liss:
+            # ~ print(xxx.shape)
         X = torch.cat(torch.split(X, X.shape[0]//self.K, dim=0), dim=-1)
         #print("XShape:", X.shape)
         X = self.fc11(F.relu(self.fc10(X)))
@@ -255,7 +255,7 @@ class GMAN(torch.nn.Module):
         self.fc27 = torch.nn.Linear(D, 1)
 
     def forward(self, X, SE, TE):
-        X = X.unsqueeze_(3)
+        X = X.unsqueeze(3)
         X = self.fc2(F.relu(self.fc1(X)))
         STE = self.STEmb(SE, TE)
         STE_P = STE[:, : self.P]
@@ -265,9 +265,35 @@ class GMAN(torch.nn.Module):
         X = self.transformAttention(X, STE_P, STE_Q)
         #for _ in range(L):
         X = self.STAttBlockDec(X, STE_Q)
-        print("X shape ater STATTDec is")
-        print(X.shape)
+        #print("X shape ater STATTDec is")
+        #print(X.shape)
         X = self.fc27(F.relu(self.fc26(X)))
-        print("X shape ater FinalFC is")
-        print(X.shape)
+        #print("X shape ater FinalFC is")
+        #print(X.shape)
         return X.squeeze(3)
+
+
+def mae_loss(pred, label):
+    #print("****Inside mae_loss block***")
+    #print("predShape:", pred.shape)
+    #print("labelShape:", label.shape)
+    mask = (label != 0)
+    #print("maskShape:", mask.shape)
+    mask = mask.type(torch.FloatTensor)
+    #print("maskShape:", mask.shape)
+    mask /= torch.mean(mask) #TODO:- Why is this needed??
+    #print("maskShape:", mask.shape)
+    #mask = tf.compat.v2.where(condition = tf.math.is_nan(mask), x = 0., y = mask)
+    mask[mask!=mask] = 0 #TODO:- is this correct and efficient??
+    #print("maskShape:", mask.shape)
+    loss = torch.abs(pred - label)
+    #print("lossShape:", loss.shape)
+    loss *= mask
+    #print("lossShape:", loss.shape)
+    #loss = tf.compat.v2.where(condition = tf.math.is_nan(loss), x = 0., y = loss)
+    loss[loss!=loss] = 0 #TODO:- is this correct and efficient??
+    #print("lossShape:", loss.shape)
+    loss = torch.mean(loss)
+    #print("lossitem:", loss)
+    #print("****Exiting mae_loss block***")
+    return loss

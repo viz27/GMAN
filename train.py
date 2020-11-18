@@ -64,6 +64,9 @@ device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 trainX = torch.FloatTensor(trainX).to(device)
 trainTE = torch.LongTensor(trainTE).to(device)
 trainY = torch.FloatTensor(trainY).to(device)
+valX = torch.FloatTensor(valX).to(device)
+valTE = torch.LongTensor(valTE).to(device)
+valY = torch.FloatTensor(valY).to(device)
 SE = torch.FloatTensor(SE).to(device)
 
 TEmbsize = (24*60//args.time_slot)+7 #number of slots in a day + number of days in a week
@@ -108,32 +111,32 @@ for epoch in range(args.max_epoch):
         print("Loss: ", batchloss.item())
         batchloss.backward()
         optimizer.step()
-        #train_loss += batchloss.item() * (end_idx - start_idx)
-    #train_loss /= num_train
+        train_loss += batchloss.item() * (end_idx - start_idx)
+    train_loss /= num_train
     end_train = time.time()
-    # ~ # val loss
-    # ~ start_val = time.time()
-    # ~ val_loss = 0
-    # ~ num_batch = math.ceil(num_val / args.batch_size)
-    # ~ for batch_idx in range(num_batch):
-        # ~ start_idx = batch_idx * args.batch_size
-        # ~ end_idx = min(num_val, (batch_idx + 1) * args.batch_size)
-        # ~ feed_dict = {
-            # ~ X: valX[start_idx : end_idx],
-            # ~ TE: valTE[start_idx : end_idx],
-            # ~ label: valY[start_idx : end_idx],
-            # ~ is_training: False}
-        # ~ loss_batch = sess.run(loss, feed_dict = feed_dict)
-        # ~ val_loss += loss_batch * (end_idx - start_idx)
-    # ~ val_loss /= num_val
-    # ~ end_val = time.time()
-    # ~ utils.log_string(
-        # ~ log,
-        # ~ '%s | epoch: %04d/%d, training time: %.1fs, inference time: %.1fs' %
-        # ~ (datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), epoch + 1,
-         # ~ args.max_epoch, end_train - start_train, end_val - start_val))
-    # ~ utils.log_string(
-        # ~ log, 'train loss: %.4f, val_loss: %.4f' % (train_loss, val_loss))
+    # val loss
+    start_val = time.time()
+    val_loss = 0
+    num_batch = math.ceil(num_val / args.batch_size)
+    for batch_idx in range(num_batch):
+        gman.eval()
+        start_idx = batch_idx * args.batch_size
+        end_idx = min(num_val, (batch_idx + 1) * args.batch_size)
+        batchX = valX[start_idx : end_idx]
+        batchTE = valTE[start_idx : end_idx]
+        batchlabel = valY[start_idx : end_idx]
+        batchpred = gman(batchX, SE, batchTE)
+        batchloss = model.mae_loss(batchpred, batchlabel, device)
+        val_loss += batchloss.item() * (end_idx - start_idx)
+    val_loss /= num_val
+    end_val = time.time()
+    utils.log_string(
+        log,
+        '%s | epoch: %04d/%d, training time: %.1fs, inference time: %.1fs' %
+        (datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S'), epoch + 1,
+         args.max_epoch, end_train - start_train, end_val - start_val))
+    utils.log_string(
+        log, 'train loss: %.4f, val_loss: %.4f' % (train_loss, val_loss))
     # ~ if val_loss <= val_loss_min:
         # ~ utils.log_string(
             # ~ log,

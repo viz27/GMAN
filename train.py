@@ -69,6 +69,9 @@ trainY = torch.FloatTensor(trainY).to(device)
 valX = torch.FloatTensor(valX).to(device)
 valTE = torch.LongTensor(valTE).to(device)
 valY = torch.FloatTensor(valY).to(device)
+testX = torch.FloatTensor(testX).to(device)
+testTE = torch.LongTensor(testTE).to(device)
+testY = torch.FloatTensor(testY).to(device)
 SE = torch.FloatTensor(SE).to(device)
 
 TEmbsize = (24*60//args.time_slot)+7 #number of slots in a day + number of days in a week
@@ -152,3 +155,82 @@ for epoch in range(args.max_epoch):
         torch.save(gman.state_dict(), args.path+args.model_file)
     else:
         wait += 1
+
+
+# test model
+utils.log_string(log, '**** testing model ****')
+utils.log_string(log, 'loading model from %s' % (args.path+args.model_file))
+gman.load_state_dict(torch.load(args.path+args.model_file))
+utils.log_string(log, 'model restored!')
+utils.log_string(log, 'evaluating...')
+
+num_test = testX.shape[0]
+
+trainPred = []
+num_batch = math.ceil(num_train / args.batch_size)
+for batch_idx in range(num_batch):
+    start_idx = batch_idx * args.batch_size
+    end_idx = min(num_train, (batch_idx + 1) * args.batch_size)
+    batchX = trainX[start_idx : end_idx]
+    batchTE = trainTE[start_idx : end_idx]
+    batchlabel = trainY[start_idx : end_idx]
+    batchpred = gman(batchX, SE, batchTE)
+    trainPred.append(batchpred.detach().cpu().numpy())
+trainPred = np.concatenate(trainPred, axis = 0)
+
+valPred = []
+num_batch = math.ceil(num_val / args.batch_size)
+for batch_idx in range(num_batch):
+    start_idx = batch_idx * args.batch_size
+    end_idx = min(num_val, (batch_idx + 1) * args.batch_size)
+    batchX = valX[start_idx : end_idx]
+    batchTE = valTE[start_idx : end_idx]
+    batchlabel = valY[start_idx : end_idx]
+    batchpred = gman(batchX, SE, batchTE)
+    valPred.append(batchpred.detach().cpu().numpy())
+valPred = np.concatenate(valPred, axis = 0)
+
+testPred = []
+num_batch = math.ceil(num_test / args.batch_size)
+start_test = time.time()
+for batch_idx in range(num_batch):
+    start_idx = batch_idx * args.batch_size
+    end_idx = min(num_test, (batch_idx + 1) * args.batch_size)
+    batchX = testX[start_idx : end_idx]
+    batchTE = testTE[start_idx : end_idx]
+    batchlabel = testY[start_idx : end_idx]
+    batchpred = gman(batchX, SE, batchTE)
+    testPred.append(batchpred.detach().cpu().numpy())
+end_test = time.time()
+testPred = np.concatenate(testPred, axis = 0)
+
+train_mae, train_rmse, train_mape = utils.metric(trainPred, trainY)
+val_mae, val_rmse, val_mape = utils.metric(valPred, valY)
+test_mae, test_rmse, test_mape = utils.metric(testPred, testY)
+utils.log_string(log, 'testing time: %.1fs' % (end_test - start_test))
+utils.log_string(log, '                MAE\t\tRMSE\t\tMAPE')
+utils.log_string(log, 'train            %.2f\t\t%.2f\t\t%.2f%%' %
+                 (train_mae, train_rmse, train_mape * 100))
+utils.log_string(log, 'val              %.2f\t\t%.2f\t\t%.2f%%' %
+                 (val_mae, val_rmse, val_mape * 100))
+utils.log_string(log, 'test             %.2f\t\t%.2f\t\t%.2f%%' %
+                 (test_mae, test_rmse, test_mape * 100))
+utils.log_string(log, 'performance in each prediction step')
+MAE, RMSE, MAPE = [], [], []
+for q in range(args.Q):
+    mae, rmse, mape = utils.metric(testPred[:, q], testY[:, q])
+    MAE.append(mae)
+    RMSE.append(rmse)
+    MAPE.append(mape)
+    utils.log_string(log, 'step: %02d         %.2f\t\t%.2f\t\t%.2f%%' %
+                     (q + 1, mae, rmse, mape * 100))
+average_mae = np.mean(MAE)
+average_rmse = np.mean(RMSE)
+average_mape = np.mean(MAPE)
+utils.log_string(
+    log, 'average:         %.2f\t\t%.2f\t\t%.2f%%' %
+    (average_mae, average_rmse, average_mape * 100))
+end = time.time()
+utils.log_string(log, 'total time: %.1fmin' % ((end - start) / 60))
+sess.close()
+log.close()

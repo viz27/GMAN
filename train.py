@@ -79,6 +79,7 @@ optimizer = torch.optim.Adam(gman.parameters(), lr=args.learning_rate, weight_de
 # ~ print("loss:", loss.item())
 
 num_train, _, N = trainX.shape
+num_val = valX.shape[0]
 wait = 0
 val_loss_min = np.inf
 for epoch in range(args.max_epoch):

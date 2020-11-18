@@ -98,7 +98,6 @@ for epoch in range(args.max_epoch):
     for batch_idx in range(num_batch):
         gman.train()
         optimizer.zero_grad()
-        print("Batch: ", batch_idx+1, "out of", num_batch, end=" | ")
         start_idx = batch_idx * args.batch_size
         end_idx = min(num_train, (batch_idx + 1) * args.batch_size)
         batchX = trainX[start_idx : end_idx]
@@ -109,7 +108,9 @@ for epoch in range(args.max_epoch):
         #print("batchTEShape:", batchTE.shape)
         batchpred = gman(batchX, SE, batchTE)
         batchloss = model.mae_loss(batchpred, batchlabel, device)
-        print("Loss: ", batchloss.item())
+        if (batch_idx+1) % 100 == 0:
+            print("Batch: ", batch_idx+1, "out of", num_batch, end=" | ")
+            print("Loss: ", batchloss.item())
         batchloss.backward()
         optimizer.step()
         train_loss += batchloss.item() * (end_idx - start_idx)

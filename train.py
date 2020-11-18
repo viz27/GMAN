@@ -28,12 +28,14 @@ parser.add_argument('--batch_size', type = int, default = 10,
                     help = 'batch size')
 parser.add_argument('--max_epoch', type = int, default = 1000,
                     help = 'epoch to run')
-parser.add_argument('--patience', type = int, default = 10,
+parser.add_argument('--patience', type = int, default = 5,
                     help = 'patience for early stop')
 parser.add_argument('--learning_rate', type=float, default = 0.001,
                     help = 'initial learning rate')
 parser.add_argument('--decay_epoch', type=int, default = 5,
                     help = 'decay epoch')
+parser.add_argument('--path', default = './',
+                    help = 'traffic file')
 parser.add_argument('--traffic_file', default = 'data/PeMS.h5',
                     help = 'traffic file')
 parser.add_argument('--SE_file', default = 'data/SE(PeMS).txt',
@@ -139,13 +141,14 @@ for epoch in range(args.max_epoch):
          args.max_epoch, end_train - start_train, end_val - start_val))
     utils.log_string(
         log, 'train loss: %.4f, val_loss: %.4f' % (train_loss, val_loss))
-    # ~ if val_loss <= val_loss_min:
-        # ~ utils.log_string(
-            # ~ log,
-            # ~ 'val loss decrease from %.4f to %.4f, saving model to %s' %
-            # ~ (val_loss_min, val_loss, args.model_file))
-        # ~ wait = 0
-        # ~ val_loss_min = val_loss
-        # ~ saver.save(sess, args.model_file)
-    # ~ else:
-        # ~ wait += 1
+    if val_loss <= val_loss_min:
+        utils.log_string(
+            log,
+            'val loss decrease from %.4f to %.4f, saving model to %s' %
+            (val_loss_min, val_loss, args.path+args.model_file))
+        wait = 0
+        val_loss_min = val_loss
+        #saver.save(sess, args.model_file)
+        torch.save(gman.state_dict(), args.path+args.model_file)
+    else:
+        wait += 1

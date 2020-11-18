@@ -36,7 +36,7 @@ def seq2instance(data, P, Q):
 
 def loadData(args):
     # Traffic
-    df = pd.read_hdf(args.traffic_file)
+    df = pd.read_hdf(args.path+args.traffic_file)
     Traffic = df.values
     
     print("Initial loaded traffic Shape is: ", Traffic.shape)
@@ -64,7 +64,7 @@ def loadData(args):
     testX = (testX - mean) / std
 
     # spatial embedding 
-    f = open(args.SE_file, mode = 'r')
+    f = open(args.path+args.SE_file, mode = 'r')
     lines = f.readlines()
     temp = lines[0].split(' ')
     N, dims = int(temp[0]), int(temp[1])

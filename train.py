@@ -77,10 +77,6 @@ TEmbsize = (24*60//args.time_slot)+7 #number of slots in a day + number of days 
 gman = model.GMAN(args.K, args.d, SE.shape[1], TEmbsize, args.P, args.L, device).to(device)
 optimizer = torch.optim.Adam(gman.parameters(), lr=args.learning_rate, weight_decay=0.00001)
 
-# ~ pred = gman(trainX[0:10], SE, trainTE[0:10])
-# ~ label = trainY[0:10]
-# ~ loss = model.mae_loss(pred, label)
-# ~ print("loss:", loss.item())
 
 utils.log_string(log, '**** training model ****')
 if args.load_model == 'T':
@@ -111,9 +107,6 @@ for epoch in range(args.max_epoch):
         batchX = trainX[start_idx : end_idx]
         batchTE = trainTE[start_idx : end_idx]
         batchlabel = trainY[start_idx : end_idx]
-        #print("batchXShape:", batchX.shape)
-        #print("SEShape:", SE.shape)
-        #print("batchTEShape:", batchTE.shape)
         batchpred = gman(batchX, SE, batchTE)
         batchloss = model.mae_loss(batchpred, batchlabel, device)
         if (batch_idx+1) % 100 == 0:
